@@ -6,7 +6,6 @@ from datetime import datetime
 websiteurl = "www.heise.de"
 file = open("mongocredentials.txt")
 mongoclient_credentials = file.readline()
-# print(mongoclient_credentials)
 
 mongoconnectionstring = f"mongodb+srv://{mongoclient_credentials}?retryWrites=true&w=majority"
 
@@ -33,7 +32,7 @@ def reply():
     res = MessagingResponse()
     user = users.find_one({"number": number})
     if bool(user) == False:
-        res.message("Servus!\n Schön, dass du die Experten für PKW, Motorrad, Wohnwagen und -mobil kontaktiert hast! Mit unserem virtuellen WhatsApp Assistenten kannst du uns alle wichtigen Informationen zu deinem Anliegen mitteilen. \n Willst du \n 1⃣ fortfahren oder \n 2⃣ abbrechen?")
+        res.message("Servus!\nSchön, dass du die Experten für PKW, Motorrad, Wohnwagen und -mobil kontaktiert hast! Mit unserem virtuellen WhatsApp Assistenten kannst du uns alle wichtigen Informationen zu deinem Anliegen mitteilen. \n Willst du \n 1⃣ fortfahren oder \n 0⃣ abbrechen?")
         users.insert_one({"number": number, "status": "main", "messages": []})
     elif user["status"] == "main":
         try:
@@ -42,14 +41,19 @@ def reply():
             res.message("Bitte gib eine gültige Antwort ein!")
             return str(res)
         if option == 1:
+            #res.message(f"Für mehr Informationen besuche unsere Website {websiteurl}.")
             res.message(f"Für mehr Informationen besuche unsere Website {websiteurl}.")
+        elif option == 0:
+            res.message(f"Der virtuelle Assistent wurde auf deinen Wunsch beendet - alle über dich gespeicherten Daten wurden gelöscht. \n Du kannst uns auch eine Nachricht an <e-Mail> schicken oder uns zu unseren Öffnungszeiten (9.00 - 18:00) telefonisch erreichen.\n Für mehr Informationen besuche unsere Website {websiteurl}.")
+            users.delete_one({"number": number})
         else:
-            res.message(f"Der virtuelle Assistent wurde auf deinen Wunsch beendet. \n Du kannst uns auch eine Nachricht an <e-Mail> schicken oder und zu unseren Öffnungszeiten (9.00 - 18:00) telefonisch erreichen.\n Für mehr Informationen besuche unsere Website {websiteurl}.")
-            return str(res)
+            res.message(
+                f"Bitte gibt eine gültige Auswahl ein!")
+        return str(res)
 
     else:
         res.message("Die letzte Eingabe kann nicht interpretiert werden.")
-    user.update_one({"number": number}, {"$push": {"messages": {"text": text, "date": datetime.now()}}})
+    users.update_one({"number": number}, {"$push": {"messages": {"text": text, "date": datetime.now()}}})
 
 
 
