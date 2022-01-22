@@ -2,10 +2,12 @@ from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from pymongo import MongoClient
 from datetime import datetime
+import re
 
 websiteurl = "www.heise.de"
+telefonnummer_muster = r'\+?[\d]{5,12}'
+
 file = open("mongocredentials.txt")
-telnum = '12345'
 mongoclient_credentials = file.readline()
 
 mongoconnectionstring = f"mongodb+srv://{mongoclient_credentials}?retryWrites=true&w=majority"
@@ -34,8 +36,11 @@ texte = {
                       f'schicken oder uns zu unseren Öffnungszeiten (9.00 - 18:00) telefonisch erreichen.\n Für mehr '
                       f'Informationen besuche unsere Website {websiteurl}. ',
     'text_wertermittlung': 'Du möchtest eine Wertermittlung durchführen lassen. Für eine Bearbeitung auf der '
-                           'Fastlane, teile uns bitte einige Daten mit oder wähle 0⃣ zum *abbrechen*. ',
-    'text_kontaktdaten': f'Dürfen wir dich unter dieser Nummer kontaktieren: {telnum}? Wähle \n 1⃣ für ja oder \n gib entweder eine andere Telefonnummer oder eine e-Mail Adresse ein!'
+                           'Fastlane, teile uns bitte einige Daten mit:\n Dürfen wir dich unter dieser Nummer '
+                           'kontaktieren: <telnum>?\n Wähle 1⃣ für ja oder \n gib eine andere Telefonnummer oder '
+                           'eine e-Mail Adresse ein!\n Oder wähle 0⃣ zum *abbrechen*.',
+    'telefonnummer_erkannt': 'Wir haben diese Nummer erkannt: ',
+    'telefonnummer_wie_im_messenger': 'Wir haben deine Nummer für eine Kontaktaufnahme gespeichert!'
         }
 
 
@@ -47,6 +52,8 @@ def reply():
 
     # if (users.find_one() == True):  ## for testing purposes: delete all database entries
     #     users.delete_many()
+    if (orders.find_one() == True):  ## for testing purposes: delete all database entries
+        orders.delete_many()
 
     text = request.form.get("Body")
     number = request.form.get("From")
@@ -80,7 +87,7 @@ def reply():
             # users.update_one({"number": number}, {"$set": {"status": "main"}})
             dialog_abbruch()
         elif option == 1:
-            res.message(texte['text_wertermittlung'])
+            res.message(texte['text_wertermittlung'].replace('<telnum>', str(number)))
             users.update_one({"number": number}, {"$set": {"status": "wertermittlung"}})
         elif option <= 2:
             res.message(texte['text_baustelle'])
@@ -89,14 +96,21 @@ def reply():
         try:
             option = int(text)
         except:
-            res.message(texte['text_ungueltige_auswahl'])
+            nummer_eingegeben = re.findall(telefonnummer_muster, text)
+            if nummer_eingegeben:
+                res.message(texte['telefonnummer_erkannt'] + str(nummer_eingegeben))
+                orders.insert_one({"number": nummer_eingegeben, "status": "wertermittlung", "messages": []})
+            else:
+                res.message(texte['text_ungueltige_auswahl'])
             return str(res)
         if option == 0:
             dialog_abbruch()
+        elif option == 1:
+            res.message(texte['telefonnummer_wie_im_messenger'])
+            orders.insert_one({"number": number, "status": "wertermittlung", "messages": []})
         else:
-            telnum = number
-            res.message(texte['text_kontaktdaten'])
-            users.update_one({"number": number}, {"$set": {"status": "kontaktdateneingabe"}})
+            res.message(texte['text_ungueltige_auswahl'])
+            # users.update_one({"number": number}, {"$set": {"status": "kontaktdateneingabe"}})
             users.delete_one({"number": number})
     else:
         res.message(texte['text_ungueltige_auswahl'])
