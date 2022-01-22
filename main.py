@@ -5,6 +5,7 @@ from datetime import datetime
 
 websiteurl = "www.heise.de"
 file = open("mongocredentials.txt")
+telnum = '12345'
 mongoclient_credentials = file.readline()
 
 mongoconnectionstring = f"mongodb+srv://{mongoclient_credentials}?retryWrites=true&w=majority"
@@ -28,7 +29,13 @@ texte = {
     'text_ungueltige_auswahl': 'Bitte gib eine gültige Auswahl ein!',
     'text_anliegen_art': 'Was möchtest du? \n1⃣ eine *Wertermittlung* oder \n2⃣ eine *Schadenfeststellung* \ndeines '
                     'Fahrzeugs? \nOder willst du 0⃣ *abbrechen?* ',
-    'text_baustelle': f'Der virtuelle Assistent wurde wegen einer Programmbaustelle beendet - alle über dich gespeicherten Daten wurden gelöscht. \n Du kannst uns auch eine Nachricht an <e-Mail> schicken oder uns zu unseren Öffnungszeiten (9.00 - 18:00) telefonisch erreichen.\n Für mehr Informationen besuche unsere Website {websiteurl}.'
+    'text_baustelle': f'Der virtuelle Assistent wurde wegen einer Programmbaustelle beendet - alle über dich '
+                      f'gespeicherten Daten wurden gelöscht. \n Du kannst uns auch eine Nachricht an <e-Mail> '
+                      f'schicken oder uns zu unseren Öffnungszeiten (9.00 - 18:00) telefonisch erreichen.\n Für mehr '
+                      f'Informationen besuche unsere Website {websiteurl}. ',
+    'text_wertermittlung': 'Du möchtest eine Wertermittlung durchführen lassen. Für eine Bearbeitung auf der '
+                           'Fastlane, teile uns bitte einige Daten mit oder wähle 0⃣ zum *abbrechen*. ',
+    'text_kontaktdaten': f'Dürfen wir dich unter dieser Nummer kontaktieren: {telnum}? Wähle \n 1⃣ für ja oder \n gib entweder eine andere Telefonnummer oder eine e-Mail Adresse ein!'
         }
 
 
@@ -70,11 +77,26 @@ def reply():
             res.message("Bitte gib eine gültige Auswahl ein!")
             return str(res)
         if option == 0:
-            users.update_one(
-                {"number": number}, {"$set": {"status": "main"}})
+            # users.update_one({"number": number}, {"$set": {"status": "main"}})
             dialog_abbruch()
-        elif 1 <= option <= 2:
+        elif option == 1:
+            res.message(texte['text_wertermittlung'])
+            users.update_one({"number": number}, {"$set": {"status": "wertermittlung"}})
+        elif option <= 2:
             res.message(texte['text_baustelle'])
+            users.delete_one({"number": number})
+    elif user['status'] == 'wertermittlung':
+        try:
+            option = int(text)
+        except:
+            res.message(texte['text_ungueltige_auswahl'])
+            return str(res)
+        if option == 0:
+            dialog_abbruch()
+        else:
+            telnum = number
+            res.message(texte['text_kontaktdaten'])
+            users.update_one({"number": number}, {"$set": {"status": "kontaktdateneingabe"}})
             users.delete_one({"number": number})
     else:
         res.message(texte['text_ungueltige_auswahl'])
