@@ -41,8 +41,8 @@ texte = {
                            'eine e-Mail Adresse ein!\n Oder wähle 0⃣ zum *abbrechen*.',
     'text_telefonnummer_erkannt': 'Wir haben diese Nummer erkannt für eine Kontaktaufnahme gespeichert: ',
     'text_telefonnummer_wie_im_messenger': 'Wir haben deine Nummer für eine Kontaktaufnahme gespeichert!',
-    'text_abschluss': 'Wir werden dich umgehend kontaktieren und freuen uns, dich und dein Fahrzeug kennenzulernen! '
-                      '\nWenn du alle über dich gespeicherten Daten wieder löschen möchtest, wähle 0⃣!\nWir werden '
+    'text_abschluss': '\nWir werden dich umgehend kontaktieren und freuen uns, dich und dein Fahrzeug kennenzulernen! '
+                      '\n\nWenn du alle über dich gespeicherten Daten wieder löschen möchtest, wähle 0⃣!\nWir werden '
                       'dich dann nicht kontaktieren, sondern warten auf deine Meldung. '
         }
 
@@ -96,29 +96,28 @@ def reply(nummer_referenz=None):
             res.message(texte['text_baustelle'])
             users.delete_one({"number": number})
     elif user['status'] == 'wertermittlung':
+        nummer_eingegeben = re.findall(telefonnummer_muster, text)
+        if nummer_eingegeben:
+            nummer_referenz = nummer_eingegeben[0]
+            res.message(texte['text_telefonnummer_erkannt'] + str(nummer_referenz) + texte['text_abschluss'])
+            orders.insert_one({"number": number, "nummer_referenz": nummer_referenz, "status": "wertermittlung", "messages": []})
+            users.update_one({"number": number}, {"$set": {"status": "abschluss"}})
+            return str(res)
         try:
             option = int(text)
         except:
-            nummer_eingegeben = re.findall(telefonnummer_muster, text)
-            if nummer_eingegeben:
-                nummer_referenz = nummer_eingegeben[0]
-                res.message(texte['text_telefonnummer_erkannt'] + str(nummer_referenz))
-                orders.insert_one({"number": nummer_referenz, "status": "wertermittlung", "messages": []})
-                users.update_one({"number": number}, {"$set": {"status": "abschluss"}})
-            else:
-                res.message(texte['text_ungueltige_auswahl'])
+            res.message('text_ungueltige_auswahl')
             return str(res)
         if option == 0:
             dialog_abbruch()
         elif option == 1:
-            res.message(texte['text_telefonnummer_wie_im_messenger'])
+            res.message(texte['text_telefonnummer_wie_im_messenger'] + texte['text_abschluss'])
             orders.insert_one({"number": number, "status": "wertermittlung", "messages": []})
             users.update_one({"number": number}, {"$set": {"status": "abschluss"}})
-            nummer_referenz = number
         else:
             res.message(texte['text_ungueltige_auswahl'])
             # users.update_one({"number": number}, {"$set": {"status": "kontaktdateneingabe"}})
-            return str(res)
+        return str(res)
             # users.delete_one({"number": number})
     elif user['status'] == 'abschluss':
         # users.update_one({"number": number}, {"$set": {"status": "fertig"}})
@@ -130,7 +129,7 @@ def reply(nummer_referenz=None):
             res.message(texte['text_ungueltige_auswahl'])
             return str(res)
         if option == 0:
-            orders.delete_one({"number": nummer_referenz})
+            orders.delete_one({"number": number})
             dialog_abbruch()
         else:
             res.message(texte['text_ungueltige_auswahl'])
@@ -138,7 +137,6 @@ def reply(nummer_referenz=None):
     else:
         res.message(texte['text_ungueltige_auswahl'])
     users.update_one({"number": number}, {"$push": {"messages": {"text": text, "date": datetime.now()}}})
-
     return str(res)
 
 
